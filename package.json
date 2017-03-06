@@ -1,0 +1,33 @@
+{
+  "name": "leaflet-wordcloud",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "webpack": "npm install && ./node_modules/.bin/webpack -d --watch",
+    "start": "npm install && ./node_modules/.bin/http-server src/public -p 8000"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/peterschretlen/leaflet-wordcloud.git"
+  },
+  "author": "",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/peterschretlen/leaflet-wordcloud/issues"
+  },
+  "homepage": "https://github.com/peterschretlen/leaflet-wordcloud#readme",
+  "devDependencies": {
+    "babel": "^6.23.0",
+    "babel-core": "^6.23.1",
+    "babel-loader": "^6.3.2",
+    "babel-preset-es2015": "^6.22.0",
+    "http-server": "^0.9.0",
+    "webpack": "^2.2.1"
+  },
+  "dependencies": {
+    "jquery": "1.11.3",
+    "leaflet": "0.7.5"
+  }
+}
