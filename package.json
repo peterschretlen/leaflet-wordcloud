@@ -27,6 +27,7 @@
     "webpack": "^2.2.1"
   },
   "dependencies": {
+    "faker": "^4.1.0",
     "jquery": "1.11.3",
     "leaflet": "0.7.5"
   }

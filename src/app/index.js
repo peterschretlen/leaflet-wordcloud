@@ -1,5 +1,8 @@
 import L from 'leaflet';
 import $ from 'jquery';
+import faker from 'faker';
+
+const config = require('../../config.json');
 
 var MAX_TAGS_PER_TILE = 10;
 var TILE_PADDING_WIDTH = 10;
@@ -8,8 +11,15 @@ var FONT_SIZING_METHOD_LOG = "log";
 var MIN_FONT = 10;
 var MAX_FONT = 20;
 
-var GROUPBY_API_URL = "https://xyz-cors.groupbycloud.com/wisdom/v2/public/recommendations/searches/_getPopular";
-var HOSTNAME_FILTER = 'www.xyz.com';
+var GROUPBY_API_URL = `https://${config.customerId}-cors.groupbycloud.com/wisdom/v2/public/recommendations/searches/_getPopular`;
+var HOSTNAME_FILTER = config.hostFilter;
+
+//for debugging
+window.faker = faker;
+//Set seed for consistent results.
+faker.seed(31415);
+
+const fakeTermLookup = {};
 
 var updateWordPosition = function(wordPos) {
     var diameter = 2 * Math.PI * wordPos.radius;
@@ -139,6 +149,8 @@ var tagsToLabelSpecs = function(tags, levelMinFreq, levelMaxFreq, fontSizingMeth
     return labelSpecs;
 };
 
+const slugifyTerm = (word) => word.split(" ").join("_").split("'").join("_");
+
 var renderTile = function(jqTile, tileData, level, highlightedWord) {
     var labelSpecs;
     var numTags = Math.min(tileData.tags ? tileData.tags.length : 0, MAX_TAGS_PER_TILE);
@@ -149,7 +161,10 @@ var renderTile = function(jqTile, tileData, level, highlightedWord) {
         var countSummary = $('<div class="count-summary"></div>');
         wordCloud = wordCloud.append(countSummary);
         labelSpecs.forEach(function(spec) {
-            var label = $('<div class="word-cloud-label word-cloud-label-' + spec.percentLabel + '" style="font-size:' + spec.fontSize + "px;left:" + (128 + spec.x - spec.width / 2) + "px;top:" + (128 + spec.y - spec.height / 2) + "px;width:" + spec.width + "px;height:" + spec.height + 'px;"data-word="' + spec.word + '">' + spec.word + "</div>");
+            var label = $('<div class="word-cloud-label word-cloud-label-' + spec.percentLabel + 
+                '" style="font-size:' + spec.fontSize + "px;left:" + (128 + spec.x - spec.width / 2) + 
+                "px;top:" + (128 + spec.y - spec.height / 2) + "px;width:" + spec.width + "px;height:" + spec.height + 
+                'px;"data-word="' + slugifyTerm(spec.word) + '">' + spec.word + "</div>");
             if(spec.word === highlightedWord) label.addClass("highlight");
             wordCloud = wordCloud.append(label);
         });
@@ -254,19 +269,29 @@ L.WordcloudLayer = L.TileLayer.extend({
         		max: "50",
         		min: "1",
         		tags: data.result.map( r => { 
-        			//clean text
-        			var term = r.query.split(" ").join("_");
-        			term = term.split("'").join("_");
-        			return { text: term, count: r.count }; })
+
+                    const nbWords = Math.floor(Math.random()*3)+1;
+
+                    //replace the query with fake words
+                    if(!fakeTermLookup[r.query]){
+
+                        if(nbWords === 1) { fakeTermLookup[r.query] = faker.fake("{{commerce.product}}"); }
+                        else if (nbWords === 2) { fakeTermLookup[r.query] = faker.fake("{{commerce.color}} {{commerce.product}}"); }
+                        else { fakeTermLookup[r.query] = faker.fake("{{commerce.productName}}"); }
+
+                    } 
+                    const query = fakeTermLookup[r.query];
+
+        			return { text: query, count: r.count }; })
         	};
 
             var tile = $(tileElem).empty();
             renderTile(tile, tileData, layer.options.dataExtents[level], layer.highlight);
             layer.tileDrawn(tileElem);
         };
-        //$.post(url, getPostData(tileZone)).then(processResponse);
-        var dummyData = {"status":{"code":200,"message":"OK","additionalInfo":null},"result":[{"query":"hair bleach","count":73},{"query":"dog","count":501},{"query":"milani","count":101},{"query":"paper towels","count":9},{"query":"childrens mucinex","count":7},{"query":"humidifier","count":6},{"query":"lice","count":6},{"query":"revlon colorsilk","count":6},{"query":"sheamoisture bar","count":6},{"query":"always discreet","count":5}],"serverTimestamp":"2017-03-05T20:12:21+00:00"};
-        processResponse(dummyData);
+        $.post(url, getPostData(tileZone)).then(processResponse);
+        //var dummyData = {"status":{"code":200,"message":"OK","additionalInfo":null},"result":[{"query":"hair bleach","count":73},{"query":"dog","count":501},{"query":"milani","count":101},{"query":"paper towels","count":9},{"query":"childrens mucinex","count":7},{"query":"humidifier","count":6},{"query":"lice","count":6},{"query":"revlon colorsilk","count":6},{"query":"sheamoisture bar","count":6},{"query":"always discreet","count":5}],"serverTimestamp":"2017-03-05T20:12:21+00:00"};
+        //processResponse(dummyData);
 
     },
     tileDrawn: function(tile) {
@@ -280,8 +305,8 @@ var map = new L.Map("map",{
     center: [37.7528, -100.0171],
     zoom: 5,
     minZoom: 4,
-    maxZoom: 10,
-    scrollWheelZoom: false
+    maxZoom: 12,
+    scrollWheelZoom: true
 });
 
 
@@ -362,7 +387,15 @@ var words = new L.WordcloudLayer("//s3.amazonaws.com/embed.pantera.io/saltdemos/
         10: {
             min: 1,
             max: 30
-        }
+        },
+        11: {
+            min: 1,
+            max: 30
+        },
+        12: {
+            min: 1,
+            max: 30
+        }                
     }
 });
 words.addTo(map),
