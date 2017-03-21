@@ -177,6 +177,7 @@ const getUniqueFake = ( origWord ) => {
 };
 
 var renderTile = function(jqTile, tileData, level, highlightedWord) {
+
     var labelSpecs;
     var numTags = Math.min(tileData.tags ? tileData.tags.length : 0, MAX_TAGS_PER_TILE);
     var wordCloud = $("<div></div>");
@@ -190,7 +191,7 @@ var renderTile = function(jqTile, tileData, level, highlightedWord) {
                 '" style="font-size:' + spec.fontSize + "px;left:" + (128 + spec.x - spec.width / 2) + 
                 "px;top:" + (128 + spec.y - spec.height / 2) + "px;width:" + spec.width + "px;height:" + spec.height + 
                 'px;"data-word="' + slugifyTerm(spec.word) + '">' + spec.word + "</div>");
-            if(spec.word === highlightedWord) label.addClass("highlight");
+            if(slugifyTerm(spec.word) === highlightedWord) label.addClass("highlight");
             wordCloud = wordCloud.append(label);
         });
         jqTile.html(wordCloud);
@@ -225,8 +226,9 @@ L.WordcloudLayer = L.TileLayer.extend({
         L.TileLayer.prototype.onRemove.call(this, tile);
     },
     onZoom: function() {
-        $(this._container).removeClass("highlight");
-        this.highlight = null;
+        //maintain the highlight during zoom
+        //$(this._container).removeClass("highlight");
+        //this.highlight = null;
     },
     onHover: function(event) {
         var target = $(event.originalEvent.target);
