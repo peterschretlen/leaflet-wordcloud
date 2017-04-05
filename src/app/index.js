@@ -2,8 +2,6 @@ import L from 'leaflet';
 import $ from 'jquery';
 import faker from 'faker';
 
-const config = require('../../config.json');
-
 const MAX_TAGS_PER_TILE = 10;
 const TILE_PADDING_WIDTH = 10;
 const TILE_PADDING_HEIGHT = 24;
@@ -12,8 +10,8 @@ const MIN_FONT = 10;
 const MAX_FONT = 20;
 const USE_FAKE = true;
 
-const GROUPBY_API_URL = `https://${config.customerId}-cors.groupbycloud.com/wisdom/v2/public/recommendations/searches/_getPopular`;
-const HOSTNAME_FILTER = config.hostFilter;
+//__CLIENTID__ is defined at build time
+const GROUPBY_API_URL = `https://${__CLIENTID__}-cors.groupbycloud.com/wisdom/v2/public/recommendations/searches/_getPopular`;
 
 const fakeTermLookup = {};
 const fakeTermReverseLookup = {};
@@ -206,7 +204,6 @@ L.WordcloudLayer = L.TileLayer.extend({
         noWrap: true
     },
     initialize: function(url, opts) {
-        this._url = url;
         L.setOptions(this, opts);
     },
     onAdd: function(tile) {
@@ -398,9 +395,6 @@ var getPostData = function(zone){
                       "lon": z.lon
                     }
                   }
-/*                },
-                "parsedUri": {
-                  "hostname": HOSTNAME_FILTER*/
                 }
               }
             }
@@ -417,7 +411,7 @@ L.tileLayer("//cartodb-basemaps-{s}.global.ssl.fastly.net/dark_all/{z}/{x}/{y}.p
     attribution: "CartoDB"
 }).addTo(map);
 var attribution = '<a href="http://www.groupbyinc.com/">GroupBy</a>';
-var words = new L.WordcloudLayer("//s3.amazonaws.com/embed.pantera.io/saltdemos/taxi-twitter/nyc-twitter-hashtags/{z}/{x}/{y}.json",{
+var words = new L.WordcloudLayer("",{
     attribution: attribution,
     dataExtents: {
         4: {
