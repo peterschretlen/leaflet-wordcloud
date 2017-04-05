@@ -1,15 +1,25 @@
 import L from 'leaflet';
 import $ from 'jquery';
+import faker from 'faker';
 
-var MAX_TAGS_PER_TILE = 10;
-var TILE_PADDING_WIDTH = 10;
-var TILE_PADDING_HEIGHT = 24;
-var FONT_SIZING_METHOD_LOG = "log";
-var MIN_FONT = 10;
-var MAX_FONT = 20;
+const config = require('../../config.json');
 
-var GROUPBY_API_URL = "https://xyz-cors.groupbycloud.com/wisdom/v2/public/recommendations/searches/_getPopular";
-var HOSTNAME_FILTER = 'www.xyz.com';
+const MAX_TAGS_PER_TILE = 10;
+const TILE_PADDING_WIDTH = 10;
+const TILE_PADDING_HEIGHT = 24;
+const FONT_SIZING_METHOD_LOG = "log";
+const MIN_FONT = 10;
+const MAX_FONT = 20;
+const USE_FAKE = true;
+
+const GROUPBY_API_URL = `https://${config.customerId}-cors.groupbycloud.com/wisdom/v2/public/recommendations/searches/_getPopular`;
+const HOSTNAME_FILTER = config.hostFilter;
+
+const fakeTermLookup = {};
+const fakeTermReverseLookup = {};
+
+window.lookup = fakeTermLookup;
+window.rlookup = fakeTermReverseLookup;
 
 var updateWordPosition = function(wordPos) {
     var diameter = 2 * Math.PI * wordPos.radius;
@@ -139,7 +149,35 @@ var tagsToLabelSpecs = function(tags, levelMinFreq, levelMaxFreq, fontSizingMeth
     return labelSpecs;
 };
 
+const slugifyTerm = (word) => word.split(" ").join("_").split("'").join("_");
+
+const getUniqueFake = ( origWord ) => {
+
+    if(fakeTermLookup[origWord]) return fakeTermLookup[origWord];
+    
+    const maxAttempts = 20;
+    const configs = ["{{commerce.product}}", "{{commerce.color}} {{commerce.product}}", "{{commerce.productName}}"];
+
+    const getConfig = () => Math.floor(Math.random()*3);
+
+    let fakeWord = '';
+    let i=0;
+    for(; i<maxAttempts; i++){
+        fakeWord = faker.fake(configs[getConfig()]);
+        if( !fakeTermReverseLookup[fakeWord] ) break;
+    }
+
+    if(i===maxAttempts){
+        console.log("warning: duplicate substitue word", fakeWord);
+    }
+
+    fakeTermLookup[origWord] = fakeWord;
+    fakeTermReverseLookup[fakeWord] = origWord;
+    return fakeWord;
+};
+
 var renderTile = function(jqTile, tileData, level, highlightedWord) {
+
     var labelSpecs;
     var numTags = Math.min(tileData.tags ? tileData.tags.length : 0, MAX_TAGS_PER_TILE);
     var wordCloud = $("<div></div>");
@@ -149,8 +187,11 @@ var renderTile = function(jqTile, tileData, level, highlightedWord) {
         var countSummary = $('<div class="count-summary"></div>');
         wordCloud = wordCloud.append(countSummary);
         labelSpecs.forEach(function(spec) {
-            var label = $('<div class="word-cloud-label word-cloud-label-' + spec.percentLabel + '" style="font-size:' + spec.fontSize + "px;left:" + (128 + spec.x - spec.width / 2) + "px;top:" + (128 + spec.y - spec.height / 2) + "px;width:" + spec.width + "px;height:" + spec.height + 'px;"data-word="' + spec.word + '">' + spec.word + "</div>");
-            if(spec.word === highlightedWord) label.addClass("highlight");
+            var label = $('<div class="word-cloud-label word-cloud-label-' + spec.percentLabel + 
+                '" style="font-size:' + spec.fontSize + "px;left:" + (128 + spec.x - spec.width / 2) + 
+                "px;top:" + (128 + spec.y - spec.height / 2) + "px;width:" + spec.width + "px;height:" + spec.height + 
+                'px;"data-word="' + slugifyTerm(spec.word) + '">' + spec.word + "</div>");
+            if(slugifyTerm(spec.word) === highlightedWord) label.addClass("highlight");
             wordCloud = wordCloud.append(label);
         });
         jqTile.html(wordCloud);
@@ -185,8 +226,9 @@ L.WordcloudLayer = L.TileLayer.extend({
         L.TileLayer.prototype.onRemove.call(this, tile);
     },
     onZoom: function() {
-        $(this._container).removeClass("highlight");
-        this.highlight = null;
+        //maintain the highlight during zoom
+        //$(this._container).removeClass("highlight");
+        //this.highlight = null;
     },
     onHover: function(event) {
         var target = $(event.originalEvent.target);
@@ -254,19 +296,23 @@ L.WordcloudLayer = L.TileLayer.extend({
         		max: "50",
         		min: "1",
         		tags: data.result.map( r => { 
-        			//clean text
-        			var term = r.query.split(" ").join("_");
-        			term = term.split("'").join("_");
-        			return { text: term, count: r.count }; })
+
+
+                    let query = r.query;
+                    if(USE_FAKE){
+                        query = getUniqueFake(r.query);
+                    }
+
+        			return { text: query, count: r.count }; })
         	};
 
             var tile = $(tileElem).empty();
             renderTile(tile, tileData, layer.options.dataExtents[level], layer.highlight);
             layer.tileDrawn(tileElem);
         };
-        //$.post(url, getPostData(tileZone)).then(processResponse);
-        var dummyData = {"status":{"code":200,"message":"OK","additionalInfo":null},"result":[{"query":"hair bleach","count":73},{"query":"dog","count":501},{"query":"milani","count":101},{"query":"paper towels","count":9},{"query":"childrens mucinex","count":7},{"query":"humidifier","count":6},{"query":"lice","count":6},{"query":"revlon colorsilk","count":6},{"query":"sheamoisture bar","count":6},{"query":"always discreet","count":5}],"serverTimestamp":"2017-03-05T20:12:21+00:00"};
-        processResponse(dummyData);
+        $.post(url, getPostData(tileZone)).then(processResponse);
+        //var dummyData = {"status":{"code":200,"message":"OK","additionalInfo":null},"result":[{"query":"hair bleach","count":73},{"query":"dog","count":501},{"query":"milani","count":101},{"query":"paper towels","count":9},{"query":"childrens mucinex","count":7},{"query":"humidifier","count":6},{"query":"lice","count":6},{"query":"revlon colorsilk","count":6},{"query":"sheamoisture bar","count":6},{"query":"always discreet","count":5}],"serverTimestamp":"2017-03-05T20:12:21+00:00"};
+        //processResponse(dummyData);
 
     },
     tileDrawn: function(tile) {
@@ -280,18 +326,53 @@ var map = new L.Map("map",{
     center: [37.7528, -100.0171],
     zoom: 5,
     minZoom: 4,
-    maxZoom: 10,
-    scrollWheelZoom: false
+    maxZoom: 12,
+    scrollWheelZoom: true
 });
 
 
 var getTileZone = function(tileCoord){
-	var zoom = map.getZoom();
-	var maxY = 2**zoom*256;
-	var coordLatLngCenter = map.unproject( L.point( (tileCoord.x+0.5)*256, maxY-(tileCoord.y+0.5)*256) );
-	var coordLatLngBottomLeft = map.unproject( L.point( (tileCoord.x)*256, maxY-(tileCoord.y+1)*256) );
-	var radius = coordLatLngCenter.distanceTo(coordLatLngBottomLeft);
-	return( { lat: coordLatLngCenter.lat, lon: coordLatLngCenter.lng, radius : radius/1000 } );
+	const zoom = map.getZoom();
+	const maxY = 2**zoom*256;
+
+    //Primary Filter
+	const coordLatLngCenter     = map.unproject( L.point( (tileCoord.x+0.5)*256, maxY-(tileCoord.y+0.5)*256) );
+	const coordLatLngBottomLeft = map.unproject( L.point( (tileCoord.x+0.5)*256, maxY-(tileCoord.y+1)*256) );
+	const radius = coordLatLngCenter.distanceTo(coordLatLngBottomLeft);
+
+    //LEVEL 1 Filter
+    const tl1 = map.unproject( L.point( (tileCoord.x+0.25)*256, maxY-(tileCoord.y+0.75)*256) );
+    const tr1 = map.unproject( L.point( (tileCoord.x+0.75)*256, maxY-(tileCoord.y+0.75)*256) );
+    const bl1 = map.unproject( L.point( (tileCoord.x+0.25)*256, maxY-(tileCoord.y+0.25)*256) );
+    const br1 = map.unproject( L.point( (tileCoord.x+0.75)*256, maxY-(tileCoord.y+0.25)*256) );
+
+    const tl1r = tl1.distanceTo( map.unproject( L.point( (tileCoord.x+0.25)*256, maxY-(tileCoord.y+1)*256) ) );
+    const tr1r = tr1.distanceTo( map.unproject( L.point( (tileCoord.x+0.75)*256, maxY-(tileCoord.y+1)*256) ) );
+    const bl1r = bl1.distanceTo( map.unproject( L.point( (tileCoord.x+0.25)*256, maxY-(tileCoord.y+0)*256) ) );
+    const br1r = br1.distanceTo( map.unproject( L.point( (tileCoord.x+0.75)*256, maxY-(tileCoord.y+0)*256) ) );
+
+    //LEVEL 2 Filter
+    const tl2 = map.unproject( L.point( (tileCoord.x+0.125)*256, maxY-(tileCoord.y+0.875)*256) );
+    const tr2 = map.unproject( L.point( (tileCoord.x+0.875)*256, maxY-(tileCoord.y+0.875)*256) );
+    const bl2 = map.unproject( L.point( (tileCoord.x+0.125)*256, maxY-(tileCoord.y+0.125)*256) );
+    const br2 = map.unproject( L.point( (tileCoord.x+0.875)*256, maxY-(tileCoord.y+0.125)*256) );
+
+    const tl2r = tl2.distanceTo( map.unproject( L.point( (tileCoord.x+0.125)*256, maxY-(tileCoord.y+1)*256) ) );
+    const tr2r = tr2.distanceTo( map.unproject( L.point( (tileCoord.x+0.875)*256, maxY-(tileCoord.y+1)*256) ) );
+    const bl2r = bl2.distanceTo( map.unproject( L.point( (tileCoord.x+0.125)*256, maxY-(tileCoord.y+0)*256) ) );
+    const br2r = br2.distanceTo( map.unproject( L.point( (tileCoord.x+0.875)*256, maxY-(tileCoord.y+0)*256) ) );
+
+	return( [
+        { lat: coordLatLngCenter.lat, lon: coordLatLngCenter.lng, radius : radius/1000 },
+        { lat: tl1.lat, lon: tl1.lng, radius : tl1r/1000 },
+        { lat: tr1.lat, lon: tr1.lng, radius : tr1r/1000 },
+        { lat: bl1.lat, lon: bl1.lng, radius : bl1r/1000 },
+        { lat: br1.lat, lon: br1.lng, radius : br1r/1000 },
+        { lat: tl2.lat, lon: tl2.lng, radius : tl2r/1000 },
+        { lat: tr2.lat, lon: tr2.lng, radius : tr2r/1000 },
+        { lat: bl2.lat, lon: bl2.lng, radius : bl2r/1000 },
+        { lat: br2.lat, lon: br2.lng, radius : br2r/1000 }        
+        ] );
 };
 
 var getPostData = function(zone){
@@ -300,28 +381,32 @@ var getPostData = function(zone){
 	  "size": 10,
 	  "window": "week",
 	  "matchExact": {
-	    "and": [
-	      {
-	        "visit": {
-	          "generated": {
-	            "geo": {
-	              "location": {
-	                "distance": `${zone.radius}km`,
-	                "center": {
-	                  "lat": zone.lat,
-	                  "lon": zone.lon
-	                }
-	              }
-	            },
-	            "parsedUri": {
-	              "hostname": HOSTNAME_FILTER
-	            }
-	          }
-	        }
-	      }
-	    ]
+	    "or": []
 	  }
 	};
+
+    postData.matchExact.or = zone.map( z => {
+
+        return {
+            "visit": {
+              "generated": {
+                "geo": {
+                  "location": {
+                    "distance": `${z.radius}km`,
+                    "center": {
+                      "lat": z.lat,
+                      "lon": z.lon
+                    }
+                  }
+/*                },
+                "parsedUri": {
+                  "hostname": HOSTNAME_FILTER*/
+                }
+              }
+            }
+          };
+    });
+
 	return JSON.stringify(postData);
 
 };
@@ -362,12 +447,20 @@ var words = new L.WordcloudLayer("//s3.amazonaws.com/embed.pantera.io/saltdemos/
         10: {
             min: 1,
             max: 30
-        }
+        },
+        11: {
+            min: 1,
+            max: 30
+        },
+        12: {
+            min: 1,
+            max: 30
+        }                
     }
 });
 words.addTo(map),
 L.control.layers({}, {
-    "Popular Search Terms": words
+    "Popular Terms (Obfuscated)": words
 }, {
     collapsed: false
 }).addTo(map);
